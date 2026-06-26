@@ -478,6 +478,21 @@ async function handleProjects(request, response, url) {
     return
   }
 
+  if (request.method === 'POST' && url.pathname === '/api/projects/close') {
+    try {
+      const body = await readJsonBody(request)
+      const result = await closeProjectTerminal({
+        name: body.name,
+        sessionId: body.sessionId,
+      })
+      sendJson(response, 200, result)
+    } catch (error) {
+      const status = typeof error?.status === 'number' ? error.status : 500
+      sendJson(response, status, { error: formatError(error) })
+    }
+    return
+  }
+
   sendJson(response, 404, { error: 'Not found' })
 }
 
@@ -656,6 +671,43 @@ async function reinitializeProject({ name, sessionId, autoExport, requestHost })
     provider: 'tmux',
     webUrl: exportInfo?.url,
     webPort: exportInfo?.port,
+    steps,
+  }
+}
+
+async function closeProjectTerminal({ name, sessionId }) {
+  const projectName = name ? normalizeProjectName(name) : projectNameFromSessionId(sessionId)
+  const projectDir = projectPath(projectName)
+  if (!(await directoryExists(projectDir))) {
+    const error = new Error(`No project folder named ${projectName}`)
+    error.status = 404
+    throw error
+  }
+
+  const sessionName = tmuxSessionName(projectName)
+  const requestedSessionName = sessionId ? requiredSessionId(sessionId) : ''
+  const sessionNames = [sessionName]
+  if (requestedSessionName && requestedSessionName !== sessionName) {
+    sessionNames.push(requestedSessionName)
+  }
+
+  const steps = [`keep project folder ${relativeProjectPath(projectDir)}`]
+  for (const name of sessionNames) {
+    await killTmuxWebExport(name, steps)
+    await killTmuxSession(name, steps)
+  }
+
+  const deleteCommand = `rm -rf ${shellQuote(projectDir)}`
+  steps.push(`manual delete only: ${deleteCommand}`)
+
+  return {
+    ok: true,
+    name: projectName,
+    cwd: projectDir,
+    relativePath: relativeProjectPath(projectDir),
+    sessionId: sessionName,
+    provider: 'tmux',
+    deleteCommand,
     steps,
   }
 }
