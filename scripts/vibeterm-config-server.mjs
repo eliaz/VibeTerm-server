@@ -9,7 +9,7 @@ import { hostname, networkInterfaces, tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
-const tlsDefaultEnabled = process.env.VIBETERM_TLS !== '0'
+const tlsDefaultEnabled = process.env.VIBETERM_TLS === '1'
 const options = {
   host: process.env.VIBETERM_UI_HOST || '0.0.0.0',
   port: Number(process.env.VIBETERM_UI_PORT || 3457),
@@ -189,6 +189,9 @@ async function printStartupInfo() {
   }
   if (options.tls && tlsMaterial?.generated) {
     console.log('Self-signed HTTPS requires the phone/Hub WebView to trust the cert. Set VIBETERM_TLS=0 for plain HTTP.')
+  }
+  if (!options.tls) {
+    console.log('TLS is off. Use this over a private LAN/VPN such as Tailscale.')
   }
   console.log(`VibeTerm UI config: ${setup.settings.uiConfigUrl}`)
   console.log(`VibeTerm STT: ${setup.settings.sttUrl} (${sttMode()})`)

@@ -20,14 +20,14 @@ VIBETERM_PROJECT_TOKEN=change-me
 VIBETERM_PROJECTS_DIR=.projects
 VIBETERM_TMUX_SESSION_PREFIX=vibeterm-
 VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'
-VIBETERM_TLS=1
+VIBETERM_TLS=0
 ```
 
 `VIBETERM_TMUX_EXEC_ROW` is the only command row run inside each new tmux project after the server changes into the project directory. Put any bootstrap work there.
 
-HTTPS is on by default. If `VIBETERM_TLS_CERT` and `VIBETERM_TLS_KEY` are missing, the server creates local self-signed certs under `.certs/`. Set `VIBETERM_TLS=0` to use plain HTTP.
+TLS is off by default because the Even Hub app/WebView may reject local self-signed certificates. Use HTTP over a private LAN/VPN such as Tailscale for the normal setup.
 
-The VibeTerm Hub app allows HTTPS URLs, but the phone/Hub WebView still has to trust the certificate. If a self-signed cert is rejected, use a real trusted cert, a trusted reverse proxy/tunnel, or temporarily set `VIBETERM_TLS=0`.
+If you have a trusted certificate or trusted reverse proxy/tunnel, set `VIBETERM_TLS=1`. If `VIBETERM_TLS_CERT` and `VIBETERM_TLS_KEY` are missing, the server creates local self-signed certs under `.certs/`, but those dummy certs are not expected to work reliably in the Hub app.
 
 On startup the server prints a setup URL. Set `VIBETERM_PUBLIC_HOST` to the LAN hostname or IP your phone can reach if the detected hostname is not resolvable. Paste the printed URL into VibeTerm Settings -> Load Settings From URL.
 
