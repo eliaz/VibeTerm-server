@@ -27,6 +27,7 @@ const options = {
   projectsDir: process.env.VIBETERM_PROJECTS_DIR || '.projects',
   tmuxExecRow: firstEnv('VIBETERM_TMUX_EXEC_ROW'),
   tmuxSessionPrefix: process.env.VIBETERM_TMUX_SESSION_PREFIX || 'vibeterm-',
+  tmuxLegacySessionPrefixes: process.env.VIBETERM_TMUX_LEGACY_SESSION_PREFIXES,
   tmuxHistoryLines: Number(process.env.VIBETERM_TMUX_HISTORY_LINES || 240),
   tmuxBootDelayMs: Number(process.env.VIBETERM_TMUX_BOOT_DELAY_MS || 1200),
   tmuxRestartExec: firstEnv('VIBETERM_TMUX_RESTART_EXEC') !== '0',
@@ -518,7 +519,10 @@ async function handleTmuxApi(request, response, url) {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/messages') {
-      const sessionId = requiredSessionId(url.searchParams.get('sessionId'))
+      const { sessionId } = await resolveTmuxProjectTarget({
+        sessionId: url.searchParams.get('sessionId'),
+        startIfMissing: true,
+      })
       const text = await captureTmuxPane(sessionId)
       sendJson(response, 200, {
         state: 'running',
@@ -543,18 +547,12 @@ async function handleTmuxApi(request, response, url) {
     if (request.method === 'POST' && url.pathname === '/api/prompt') {
       const body = await readJsonBody(request)
       const text = String(body.text || '').trim()
-      const sessionId = body.sessionId
-        ? requiredSessionId(body.sessionId)
-        : tmuxSessionName(normalizeProjectName(body.projectName))
-      if (!(await tmuxHasSession(sessionId))) {
-        if (!body.cwd) {
-          const error = new Error(`No tmux project named ${sessionId}`)
-          error.status = 404
-          throw error
-        }
-        await ensureTmuxExecSession(sessionId, String(body.cwd), [])
-        await delay(options.tmuxBootDelayMs)
-      }
+      const { sessionId } = await resolveTmuxProjectTarget({
+        sessionId: body.sessionId,
+        projectName: body.projectName,
+        cwd: body.cwd,
+        startIfMissing: true,
+      })
       if (text) {
         await sendTextToTmux(sessionId, text)
       }
@@ -564,7 +562,7 @@ async function handleTmuxApi(request, response, url) {
 
     if (request.method === 'POST' && url.pathname === '/api/key') {
       const body = await readJsonBody(request)
-      const sessionId = requiredSessionId(body.sessionId)
+      const { sessionId } = await resolveTmuxProjectTarget({ sessionId: body.sessionId })
       const key = normalizeTmuxKey(body.key)
       await sendKeyToTmux(sessionId, key)
       sendJson(response, 200, { ok: true, sessionId, key })
@@ -573,7 +571,7 @@ async function handleTmuxApi(request, response, url) {
 
     if (request.method === 'POST' && url.pathname === '/api/interrupt') {
       const body = await readJsonBody(request)
-      const sessionId = requiredSessionId(body.sessionId)
+      const { sessionId } = await resolveTmuxProjectTarget({ sessionId: body.sessionId })
       await runCommand('tmux', ['send-keys', '-t', sessionId, 'C-c'])
       sendJson(response, 200, { ok: true })
       return
@@ -850,7 +848,10 @@ async function listTmuxWebExports(requestHost) {
 }
 
 async function streamTmuxEvents(request, response, url) {
-  const sessionId = requiredSessionId(url.searchParams.get('sessionId'))
+  const { sessionId } = await resolveTmuxProjectTarget({
+    sessionId: url.searchParams.get('sessionId'),
+    startIfMissing: true,
+  })
   response.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-store',
@@ -999,10 +1000,50 @@ function projectPath(name) {
 
 function projectPathIfExists(name) {
   try {
-    return projectPath(name)
+    const fullPath = projectPath(name)
+    return existsSync(fullPath) ? fullPath : undefined
   } catch {
     return undefined
   }
+}
+
+async function resolveTmuxProjectTarget({ sessionId, projectName, cwd, startIfMissing = false }) {
+  const requestedSessionId = sessionId ? requiredSessionId(sessionId) : ''
+  const name = sessionId ? projectNameFromSessionId(sessionId) : normalizeProjectName(projectName)
+  const resolvedSessionId = tmuxSessionName(name)
+  const projectDir = projectPathIfExists(name)
+
+  if (await tmuxHasSession(resolvedSessionId)) {
+    return { projectName: name, sessionId: resolvedSessionId, cwd: projectDir }
+  }
+
+  if (
+    requestedSessionId &&
+    requestedSessionId !== resolvedSessionId &&
+    (await tmuxHasSession(requestedSessionId))
+  ) {
+    await runCommand('tmux', ['rename-session', '-t', requestedSessionId, resolvedSessionId])
+    return { projectName: name, sessionId: resolvedSessionId, cwd: projectDir }
+  }
+
+  if (!startIfMissing) {
+    throw noTmuxProjectError(name)
+  }
+
+  const launchDir = projectDir || (cwd ? String(cwd) : '')
+  if (!launchDir || !(await directoryExists(launchDir))) {
+    throw noTmuxProjectError(name)
+  }
+
+  await ensureTmuxExecSession(resolvedSessionId, launchDir, [])
+  await delay(options.tmuxBootDelayMs)
+  return { projectName: name, sessionId: resolvedSessionId, cwd: launchDir }
+}
+
+function noTmuxProjectError(projectName) {
+  const error = new Error(`No tmux project named ${projectName}`)
+  error.status = 404
+  return error
 }
 
 function relativeProjectPath(projectDir) {
@@ -1041,13 +1082,60 @@ function projectNameFromTmuxSession(sessionName) {
 
 function projectNameFromSessionId(sessionId) {
   const value = requiredSessionId(sessionId)
-  const prefix = normalizeTmuxPrefix(options.tmuxSessionPrefix)
-  if (!value.startsWith(prefix)) {
-    const error = new Error('Session does not belong to this VibeTerm server')
-    error.status = 400
-    throw error
+  for (const prefix of sessionPrefixesForProjectDecode()) {
+    if (value.startsWith(prefix)) {
+      return normalizeProjectName(value.slice(prefix.length))
+    }
   }
-  return normalizeProjectName(value.slice(prefix.length))
+
+  try {
+    const projectName = normalizeProjectName(value)
+    if (projectPathIfExists(projectName)) return projectName
+  } catch {}
+
+  const error = new Error('Session does not belong to this VibeTerm server')
+  error.status = 400
+  throw error
+}
+
+function sessionPrefixesForProjectDecode() {
+  const currentPrefix = normalizeTmuxPrefix(options.tmuxSessionPrefix)
+  return [currentPrefix, ...legacyTmuxSessionPrefixes()].sort((a, b) => b.length - a.length)
+}
+
+function legacyTmuxSessionPrefixes() {
+  const configured = String(options.tmuxLegacySessionPrefixes || '').trim()
+  if (/^(0|false|off)$/i.test(configured)) return []
+
+  const rawPrefixes = configured
+    ? configured.split(/[,\s]+/)
+    : defaultLegacyTmuxSessionPrefixes()
+
+  const currentPrefix = normalizeTmuxPrefix(options.tmuxSessionPrefix)
+  const seen = new Set()
+  const prefixes = []
+  for (const rawPrefix of rawPrefixes) {
+    const prefix = normalizeTmuxPrefix(rawPrefix)
+    if (prefix === currentPrefix || seen.has(prefix)) continue
+    seen.add(prefix)
+    prefixes.push(prefix)
+  }
+  return prefixes
+}
+
+function defaultLegacyTmuxSessionPrefixes() {
+  const namespace = String(options.sessionNamespace || '').trim()
+  const namespaceSuffix = namespace ? `${namespace}-` : ''
+  return [
+    `vibeterm-${namespaceSuffix}`,
+    `eventerm-${namespaceSuffix}`,
+    `displayterm-${namespaceSuffix}`,
+    `eterm-${namespaceSuffix}`,
+    'vibeterm-',
+    'eventerm-',
+    'displayterm-',
+    'eterm-',
+  ]
 }
 
 function tmuxExecLauncher(cwd) {
