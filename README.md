@@ -19,15 +19,23 @@ Edit `.env.local` before starting:
 VIBETERM_PROJECT_TOKEN=change-me
 VIBETERM_PROJECTS_DIR=.projects
 VIBETERM_TMUX_SESSION_PREFIX=vibeterm-
-VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'
+VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --resume --yolo --enable use_legacy_landlock'
 VIBETERM_TLS=0
 ```
 
 `VIBETERM_TMUX_EXEC_ROW` is the only command row run inside each new tmux project after the server changes into the project directory. Put any bootstrap work there.
 
+VibeTerm treats disk/process state as truth:
+
+- Projects are folders under `VIBETERM_PROJECTS_DIR`.
+- Open terminals are running tmux sessions with `VIBETERM_TMUX_SESSION_PREFIX`.
+- Web exports are running `ttyd`/`timeout` processes for those tmux sessions.
+
 TLS is off by default because the Even Hub app/WebView may reject local self-signed certificates. Use HTTP over a private LAN/VPN such as Tailscale for the normal setup.
 
 If you have a trusted certificate or trusted reverse proxy/tunnel, set `VIBETERM_TLS=1`. If `VIBETERM_TLS_CERT` and `VIBETERM_TLS_KEY` are missing, the server creates local self-signed certs under `.certs/`, but those dummy certs are not expected to work reliably in the Hub app.
+
+To expose tmux projects in a laptop browser, set `VIBETERM_TMUX_AUTO_EXPORT=1`. This starts plain HTTP `ttyd` exports from `VIBETERM_TMUX_EXPORT_BASE_PORT` for new/reinitialized projects. Treat it as very insecure: use only on a trusted LAN/VPN such as Tailscale, and leave it off otherwise.
 
 On startup the server prints a setup URL. Set `VIBETERM_PUBLIC_HOST` to the LAN hostname or IP your phone can reach if the detected hostname is not resolvable. Paste the printed URL into VibeTerm Settings -> Load Settings From URL.
 

@@ -7,4 +7,5 @@ node_modules/
 *.log
 *.pem
 *.wav
+*.swp
 .DS_Store

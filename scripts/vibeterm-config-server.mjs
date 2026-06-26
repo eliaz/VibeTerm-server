@@ -32,7 +32,7 @@ const options = {
   tmuxBootDelayMs: Number(process.env.VIBETERM_TMUX_BOOT_DELAY_MS || 1200),
   tmuxRestartExec: firstEnv('VIBETERM_TMUX_RESTART_EXEC') !== '0',
   tmuxRestartDelay: Number(process.env.VIBETERM_TMUX_RESTART_DELAY || 2),
-  tmuxAutoExport: process.env.VIBETERM_TMUX_AUTO_EXPORT !== '0',
+  tmuxAutoExport: process.env.VIBETERM_TMUX_AUTO_EXPORT === '1',
   tmuxExportBasePort: Number(process.env.VIBETERM_TMUX_EXPORT_BASE_PORT || 7681),
   tmuxExportDuration: process.env.VIBETERM_TMUX_EXPORT_DURATION || '24h',
   tmuxExportTls: process.env.VIBETERM_TMUX_EXPORT_TLS
@@ -202,6 +202,9 @@ async function printStartupInfo() {
   console.log(
     `VibeTerm tmux web export: ${options.tmuxAutoExport ? `on from ${options.tmuxExportBasePort} (${exportProtocol()})` : 'off'}`,
   )
+  if (options.tmuxAutoExport && !options.tmuxExportTls) {
+    console.log('WARNING: tmux web export is plain HTTP. Use only on a trusted LAN/VPN, for example to attach from a laptop browser.')
+  }
   console.log(`VibeTerm setup URL: ${setup.setupJsonUrl}`)
   console.log('Paste that URL into VibeTerm Settings -> Load Settings From URL.')
   console.log(`File: ${uiFile}`)
@@ -863,27 +866,27 @@ async function listTmuxSessions(limit = 20) {
 }
 
 async function listTmuxWebExports(requestHost) {
-  const sessions = await listTmuxSessions(1000)
-  const exports = []
-
   if (!options.tmuxAutoExport) {
     return {
       enabled: false,
       exportBasePort: options.tmuxExportBasePort,
-      exports,
+      exports: [],
     }
   }
 
-  for (const session of sessions) {
-    const exportInfo = await getExistingExport(session.id)
-    if (!exportInfo) continue
+  const sessions = new Map((await listTmuxSessions(1000)).map((session) => [session.id, session]))
+  const exports = []
+
+  for (const exportInfo of await getTmuxExportProcesses()) {
+    const session = sessions.get(exportInfo.sessionName)
+    const projectName = projectNameFromTmuxSession(exportInfo.sessionName)
     exports.push({
-      sessionId: session.id,
-      projectName: projectNameFromTmuxSession(session.id),
-      title: session.title,
+      sessionId: exportInfo.sessionName,
+      projectName,
+      title: session?.title || projectName,
       provider: 'tmux',
-      status: session.status,
-      cwd: session.cwd,
+      status: session?.status || 'exported',
+      cwd: session?.cwd || projectPathIfExists(projectName),
       pid: exportInfo.pid,
       port: exportInfo.port,
       url: exportUrl(exportInfo.port, requestHost),
@@ -985,25 +988,59 @@ async function getExistingExport(sessionName) {
 
 async function getTmuxExportProcesses(sessionName) {
   const result = await runCommand('ps', ['-eo', 'pid=,args='])
-  const processes = []
-  const seen = new Set()
+  const processesByKey = new Map()
 
   for (const line of result.stdout.split('\n')) {
-    if (!line.includes(sessionName)) continue
+    const exportSessionName = tmuxExportSessionNameFromCommand(line)
+    if (!exportSessionName) continue
+    if (sessionName && exportSessionName !== sessionName) continue
+    if (!tmuxSessionBelongsToServer(exportSessionName)) continue
     if (!line.includes('ttyd ') && !line.includes(' timeout ')) continue
     if (!line.includes('titleFixed') && !line.includes('tmux attach')) continue
 
     const pid = Number(line.trim().split(/\s+/, 1)[0])
-    if (!Number.isFinite(pid) || seen.has(pid)) continue
-    seen.add(pid)
-    processes.push({
+    if (!Number.isFinite(pid)) continue
+
+    const processInfo = {
       pid,
       port: Number((line.match(/ -p ([0-9]+)/) || [])[1]),
+      sessionName: exportSessionName,
       command: line.trim(),
-    })
+    }
+    const key = `${processInfo.sessionName}:${Number.isFinite(processInfo.port) ? processInfo.port : pid}`
+    const existing = processesByKey.get(key)
+    if (!existing || tmuxExportProcessRank(processInfo) > tmuxExportProcessRank(existing)) {
+      processesByKey.set(key, processInfo)
+    }
   }
 
-  return processes
+  return [...processesByKey.values()]
+    .filter((processInfo) => Number.isFinite(processInfo.port))
+    .sort((a, b) => a.port - b.port || a.sessionName.localeCompare(b.sessionName))
+}
+
+function tmuxExportSessionNameFromCommand(command) {
+  const patterns = [
+    /titleFixed=tmux:([^\s]+)/,
+    /titleFixed\s+tmux:([^\s]+)/,
+    /tmux\s+attach(?:-session)?\s+-t\s+=?([^\s]+)/,
+  ]
+
+  for (const pattern of patterns) {
+    const match = command.match(pattern)
+    if (match?.[1]) return match[1]
+  }
+  return ''
+}
+
+function tmuxSessionBelongsToServer(sessionName) {
+  return sessionPrefixesForProjectDecode().some((prefix) => String(sessionName || '').startsWith(prefix))
+}
+
+function tmuxExportProcessRank(processInfo) {
+  if (processInfo.command.includes('timeout --foreground')) return 30
+  if (processInfo.command.includes('ttyd ')) return 20
+  return 10
 }
 
 function killProcessGroup(pid, signal) {
