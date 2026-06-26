@@ -536,7 +536,6 @@ async function handleTmuxApi(request, response, url) {
     if (request.method === 'GET' && url.pathname === '/api/messages') {
       const { sessionId } = await resolveTmuxProjectTarget({
         sessionId: url.searchParams.get('sessionId'),
-        startIfMissing: true,
       })
       const text = await captureTmuxPane(sessionId)
       sendJson(response, 200, {
@@ -902,7 +901,6 @@ async function listTmuxWebExports(requestHost) {
 async function streamTmuxEvents(request, response, url) {
   const { sessionId } = await resolveTmuxProjectTarget({
     sessionId: url.searchParams.get('sessionId'),
-    startIfMissing: true,
   })
   response.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
