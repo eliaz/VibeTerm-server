@@ -1,15 +1,23 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process'
-import { createServer } from 'node:http'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createServer as createHttpServer } from 'node:http'
+import { createServer as createHttpsServer } from 'node:https'
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { hostname, tmpdir } from 'node:os'
-import { join, relative, resolve } from 'node:path'
+import { isIP } from 'node:net'
+import { hostname, networkInterfaces, tmpdir } from 'node:os'
+import { dirname, join, relative, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
+const tlsDefaultEnabled = process.env.VIBETERM_TLS !== '0'
 const options = {
   host: process.env.VIBETERM_UI_HOST || '0.0.0.0',
   port: Number(process.env.VIBETERM_UI_PORT || 3457),
   file: process.env.VIBETERM_UI_FILE || 'server/vibeterm-ui.json',
+  tls: tlsDefaultEnabled,
+  tlsCert: process.env.VIBETERM_TLS_CERT || '.certs/vibeterm.cert.pem',
+  tlsKey: process.env.VIBETERM_TLS_KEY || '.certs/vibeterm.key.pem',
+  tlsDays: Number(process.env.VIBETERM_TLS_DAYS || 3650),
   sttCommand: process.env.VIBETERM_STT_COMMAND || '',
   sttMaxBytes: Number(process.env.VIBETERM_STT_MAX_BYTES || 10 * 1024 * 1024),
   sttOpenaiModel: process.env.VIBETERM_STT_OPENAI_MODEL || 'gpt-4o-mini-transcribe',
@@ -26,7 +34,11 @@ const options = {
   tmuxAutoExport: process.env.VIBETERM_TMUX_AUTO_EXPORT !== '0',
   tmuxExportBasePort: Number(process.env.VIBETERM_TMUX_EXPORT_BASE_PORT || 7681),
   tmuxExportDuration: process.env.VIBETERM_TMUX_EXPORT_DURATION || '24h',
+  tmuxExportTls: process.env.VIBETERM_TMUX_EXPORT_TLS
+    ? process.env.VIBETERM_TMUX_EXPORT_TLS !== '0'
+    : tlsDefaultEnabled,
   publicHost: process.env.VIBETERM_PUBLIC_HOST || '',
+  publicUrl: process.env.VIBETERM_PUBLIC_URL || '',
   sessionNamespace: process.env.VIBETERM_SESSION_NAMESPACE || 'even-glasses',
 }
 
@@ -62,6 +74,20 @@ if (!Number.isFinite(options.sttTimeoutMs) || options.sttTimeoutMs <= 0) {
   process.exit(1)
 }
 
+if (!Number.isFinite(options.tlsDays) || options.tlsDays <= 0) {
+  console.error(`vibeterm-config-server: invalid VIBETERM_TLS_DAYS ${options.tlsDays}`)
+  process.exit(1)
+}
+
+if (options.publicUrl) {
+  try {
+    new URL(options.publicUrl)
+  } catch {
+    console.error(`vibeterm-config-server: invalid VIBETERM_PUBLIC_URL ${options.publicUrl}`)
+    process.exit(1)
+  }
+}
+
 if (!options.tmuxExecRow.trim()) {
   console.error('vibeterm-config-server: set VIBETERM_TMUX_EXEC_ROW in .env.local, for example:')
   console.error("  VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'")
@@ -70,9 +96,10 @@ if (!options.tmuxExecRow.trim()) {
 
 const uiFile = resolve(options.file)
 const projectsDir = resolve(options.projectsDir)
+const tlsMaterial = options.tls || options.tmuxExportTls ? ensureTlsMaterial() : undefined
 let tmuxEventId = 0
 
-const server = createServer(async (request, response) => {
+const requestHandler = async (request, response) => {
   setCorsHeaders(response)
 
   if (request.method === 'OPTIONS') {
@@ -81,11 +108,13 @@ const server = createServer(async (request, response) => {
     return
   }
 
-  const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+  const url = new URL(request.url || '/', `${publicProtocol()}://${request.headers.host || 'localhost'}`)
 
   if (url.pathname === '/health') {
     sendJson(response, 200, {
       ok: true,
+      tls: options.tls,
+      tmuxExportTls: options.tmuxExportTls,
       stt: sttMode(),
       tmux: await commandExists('tmux'),
       projectsDir,
@@ -142,7 +171,11 @@ const server = createServer(async (request, response) => {
       error: error instanceof Error ? error.message : String(error),
     })
   }
-})
+}
+
+const server = options.tls
+  ? createHttpsServer(tlsMaterial.credentials, requestHandler)
+  : createHttpServer(requestHandler)
 
 server.listen(options.port, options.host, () => {
   void printStartupInfo()
@@ -150,15 +183,138 @@ server.listen(options.port, options.host, () => {
 
 async function printStartupInfo() {
   const setup = setupPayload('')
+  console.log(`VibeTerm transport: ${publicProtocol()}`)
+  if (tlsMaterial) {
+    console.log(`VibeTerm TLS cert: ${tlsMaterial.certPath}${tlsMaterial.generated ? ' (generated local self-signed)' : ''}`)
+  }
+  if (options.tls && tlsMaterial?.generated) {
+    console.log('Self-signed HTTPS requires the phone/Hub WebView to trust the cert. Set VIBETERM_TLS=0 for plain HTTP.')
+  }
   console.log(`VibeTerm UI config: ${setup.settings.uiConfigUrl}`)
   console.log(`VibeTerm STT: ${setup.settings.sttUrl} (${sttMode()})`)
   console.log(`VibeTerm tmux projects: ${projectsDir}`)
   console.log(`VibeTerm tmux prefix: ${options.tmuxSessionPrefix}`)
   console.log(`VibeTerm tmux exec restart: ${options.tmuxRestartExec ? `on after ${options.tmuxRestartDelay}s` : 'off'}`)
-  console.log(`VibeTerm tmux web export: ${options.tmuxAutoExport ? `on from ${options.tmuxExportBasePort}` : 'off'}`)
+  console.log(
+    `VibeTerm tmux web export: ${options.tmuxAutoExport ? `on from ${options.tmuxExportBasePort} (${exportProtocol()})` : 'off'}`,
+  )
   console.log(`VibeTerm setup URL: ${setup.setupJsonUrl}`)
   console.log('Paste that URL into VibeTerm Settings -> Load Settings From URL.')
   console.log(`File: ${uiFile}`)
+}
+
+function ensureTlsMaterial() {
+  const certPath = resolve(options.tlsCert)
+  const keyPath = resolve(options.tlsKey)
+  const generated = !existsSync(certPath) || !existsSync(keyPath)
+
+  if (generated) {
+    generateLocalCertificate(certPath, keyPath)
+  }
+
+  return {
+    certPath,
+    keyPath,
+    generated,
+    credentials: {
+      cert: readFileSync(certPath),
+      key: readFileSync(keyPath),
+    },
+  }
+}
+
+function generateLocalCertificate(certPath, keyPath) {
+  mkdirSync(dirname(certPath), { recursive: true })
+  mkdirSync(dirname(keyPath), { recursive: true })
+
+  const configPath = join(dirname(certPath), 'vibeterm.openssl.cnf')
+  writeFileSync(configPath, opensslConfig(), { mode: 0o600 })
+
+  const result = spawnSync(
+    'openssl',
+    [
+      'req',
+      '-x509',
+      '-nodes',
+      '-days',
+      String(Math.floor(options.tlsDays)),
+      '-newkey',
+      'rsa:2048',
+      '-keyout',
+      keyPath,
+      '-out',
+      certPath,
+      '-config',
+      configPath,
+    ],
+    { encoding: 'utf8' },
+  )
+
+  if (result.error) {
+    throw new Error(`Unable to generate VibeTerm TLS cert with openssl: ${result.error.message}. Set VIBETERM_TLS=0 for HTTP.`)
+  }
+  if (result.status !== 0) {
+    throw new Error(`Unable to generate VibeTerm TLS cert with openssl: ${result.stderr || result.stdout}`)
+  }
+}
+
+function opensslConfig() {
+  const dnsNames = certificateDnsNames()
+  const ipNames = certificateIpNames()
+  const altNames = [
+    ...dnsNames.map((name, index) => `DNS.${index + 1} = ${opensslConfigValue(name)}`),
+    ...ipNames.map((ip, index) => `IP.${index + 1} = ${opensslConfigValue(ip)}`),
+  ]
+
+  return `[req]
+distinguished_name = dn
+x509_extensions = v3_req
+prompt = no
+
+[dn]
+CN = ${opensslConfigValue(options.publicHost || hostname() || 'localhost')}
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+${altNames.join('\n')}
+`
+}
+
+function certificateDnsNames() {
+  const names = new Set(['localhost'])
+  for (const value of [options.publicHost, options.host, hostname()]) {
+    const name = String(value || '').trim()
+    if (!name || name === '0.0.0.0' || name === '::' || isIP(name)) continue
+    names.add(name)
+  }
+  return [...names]
+}
+
+function certificateIpNames() {
+  const ips = new Set(['127.0.0.1'])
+  for (const value of [options.publicHost, options.host]) {
+    const ip = String(value || '').trim()
+    if (isIP(ip)) ips.add(ip)
+  }
+  for (const values of Object.values(networkInterfaces())) {
+    for (const address of values || []) {
+      if (address.family === 'IPv4' && !address.internal) {
+        ips.add(address.address)
+      }
+    }
+  }
+  return [...ips]
+}
+
+function opensslConfigValue(value) {
+  return String(value || '')
+    .replaceAll(/[\r\n]/g, '')
+    .trim()
 }
 
 function setCorsHeaders(response) {
@@ -202,13 +358,29 @@ function setupPayload(requestHost) {
 }
 
 function publicBaseUrl(requestHost) {
+  if (options.publicUrl) {
+    return String(options.publicUrl).replace(/\/+$/g, '')
+  }
+
+  return `${publicProtocol()}://${publicHost(requestHost)}:${options.port}`
+}
+
+function publicHost(requestHost) {
   const requestName = String(requestHost || '').split(':')[0]
-  const host =
+  return (
     options.publicHost ||
     requestName ||
     (options.host === '0.0.0.0' || options.host === '::' ? hostname() : options.host) ||
     'localhost'
-  return `http://${host}:${options.port}`
+  )
+}
+
+function publicProtocol() {
+  return options.tls ? 'https' : 'http'
+}
+
+function exportProtocol() {
+  return options.tmuxExportTls ? 'https' : 'http'
 }
 
 function setupServerUrl(pathname, baseUrl) {
@@ -240,6 +412,7 @@ function setupHtml(payload) {
     <h1>VibeTerm Setup</h1>
     <p>Copy this setup URL and paste it into VibeTerm Settings -> Load Settings From URL:</p>
     <p><a href="${escapeHtml(payload.setupJsonUrl)}">${escapeHtml(payload.setupJsonUrl)}</a></p>
+    <p>If this server uses a local self-signed certificate, the phone/Hub WebView must trust it before loading settings.</p>
     <p>Keep the token private. The raw runtime settings are shown below for troubleshooting.</p>
     <pre>${escapeHtml(settingsJson)}</pre>
   </body>
@@ -546,30 +719,39 @@ async function ensureTmuxWebExport(sessionName, requestHost, steps = []) {
   const port = await findFreePort(options.tmuxExportBasePort)
   steps.push(`web export ${exportUrl(port, requestHost)}`)
 
+  const ttydArgs = [
+    '--foreground',
+    '-k',
+    '10s',
+    options.tmuxExportDuration,
+    'ttyd',
+    '-W',
+    '-m',
+    '1',
+    '-p',
+    String(port),
+  ]
+
+  if (options.tmuxExportTls) {
+    ttydArgs.push('-S', '-C', tlsMaterial.certPath, '-K', tlsMaterial.keyPath)
+  }
+
+  ttydArgs.push(
+    '-t',
+    `titleFixed=tmux:${sessionName}`,
+    '-t',
+    'scrollback=20000',
+    '-t',
+    'scrollOnUserInput=false',
+    'tmux',
+    'attach',
+    '-t',
+    sessionName,
+  )
+
   const child = spawn(
     'timeout',
-    [
-      '--foreground',
-      '-k',
-      '10s',
-      options.tmuxExportDuration,
-      'ttyd',
-      '-W',
-      '-m',
-      '1',
-      '-p',
-      String(port),
-      '-t',
-      `titleFixed=tmux:${sessionName}`,
-      '-t',
-      'scrollback=20000',
-      '-t',
-      'scrollOnUserInput=false',
-      'tmux',
-      'attach',
-      '-t',
-      sessionName,
-    ],
+    ttydArgs,
     {
       detached: true,
       stdio: 'ignore',
@@ -798,8 +980,7 @@ async function portInUse(port) {
 }
 
 function exportUrl(port, requestHost) {
-  const host = String(requestHost || '').split(':')[0] || 'localhost'
-  return `http://${host}:${port}`
+  return `${exportProtocol()}://${publicHost(requestHost)}:${port}`
 }
 
 function projectPath(name) {

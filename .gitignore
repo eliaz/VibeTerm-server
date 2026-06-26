@@ -1,8 +1,10 @@
 node_modules/
+.certs/
 .env
 .env.local
 .logs/
 .projects/
 *.log
+*.pem
 *.wav
 .DS_Store
