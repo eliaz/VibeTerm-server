@@ -27,9 +27,7 @@ const options = {
   tmuxExportBasePort: Number(process.env.VIBETERM_TMUX_EXPORT_BASE_PORT || 7681),
   tmuxExportDuration: process.env.VIBETERM_TMUX_EXPORT_DURATION || '24h',
   publicHost: process.env.VIBETERM_PUBLIC_HOST || '',
-  hubAppUrl: process.env.VIBETERM_HUB_APP_URL || '',
   sessionNamespace: process.env.VIBETERM_SESSION_NAMESPACE || 'even-glasses',
-  printSetupQr: process.env.VIBETERM_PRINT_SETUP_QR !== '0',
 }
 
 for (let index = 0; index < args.length; index += 1) {
@@ -158,12 +156,9 @@ async function printStartupInfo() {
   console.log(`VibeTerm tmux prefix: ${options.tmuxSessionPrefix}`)
   console.log(`VibeTerm tmux exec restart: ${options.tmuxRestartExec ? `on after ${options.tmuxRestartDelay}s` : 'off'}`)
   console.log(`VibeTerm tmux web export: ${options.tmuxAutoExport ? `on from ${options.tmuxExportBasePort}` : 'off'}`)
-  console.log(`VibeTerm setup: ${setup.setupUrl}`)
-  if (setup.hubAppUrl) {
-    console.log(`VibeTerm app setup: ${setup.hubAppUrl}`)
-  }
+  console.log(`VibeTerm setup URL: ${setup.setupJsonUrl}`)
+  console.log('Paste that URL into VibeTerm Settings -> Load Settings From URL.')
   console.log(`File: ${uiFile}`)
-  await printSetupQr(setup.hubAppUrl || setup.setupUrl)
 }
 
 function setCorsHeaders(response) {
@@ -202,7 +197,6 @@ function setupPayload(requestHost) {
     name: 'VibeTerm',
     setupUrl: setupServerUrl('/setup', baseUrl),
     setupJsonUrl: setupServerUrl('/setup.json', baseUrl),
-    hubAppUrl: options.hubAppUrl ? hubAppSetupUrl(options.hubAppUrl, settings) : '',
     settings,
   }
 }
@@ -225,28 +219,8 @@ function setupServerUrl(pathname, baseUrl) {
   return url.toString()
 }
 
-function hubAppSetupUrl(appUrl, settings) {
-  const url = new URL(appUrl)
-  url.search = new URLSearchParams({
-    serverUrl: settings.serverUrl,
-    uiConfigUrl: settings.uiConfigUrl,
-    sttUrl: settings.sttUrl,
-    token: settings.token,
-    provider: settings.provider,
-    cwd: settings.cwd,
-    autoAttach: settings.autoAttach ? '1' : '0',
-    startPrompt: settings.startPrompt,
-    sessionNamespace: settings.sessionNamespace,
-    showExternalSessions: settings.showExternalSessions ? '1' : '0',
-  }).toString()
-  return url.toString()
-}
-
 function setupHtml(payload) {
   const settingsJson = JSON.stringify(payload.settings, null, 2)
-  const appLink = payload.hubAppUrl
-    ? `<p><a href="${escapeHtml(payload.hubAppUrl)}">Open configured VibeTerm app</a></p>`
-    : ''
 
   return `<!doctype html>
 <html lang="en">
@@ -264,25 +238,13 @@ function setupHtml(payload) {
   </head>
   <body>
     <h1>VibeTerm Setup</h1>
-    ${appLink}
-    <p>Use these runtime settings in the VibeTerm Hub app. Keep the token private.</p>
+    <p>Copy this setup URL and paste it into VibeTerm Settings -> Load Settings From URL:</p>
+    <p><a href="${escapeHtml(payload.setupJsonUrl)}">${escapeHtml(payload.setupJsonUrl)}</a></p>
+    <p>Keep the token private. The raw runtime settings are shown below for troubleshooting.</p>
     <pre>${escapeHtml(settingsJson)}</pre>
-    <p>JSON endpoint: <a href="${escapeHtml(payload.setupJsonUrl)}">${escapeHtml(payload.setupJsonUrl)}</a></p>
   </body>
 </html>
 `
-}
-
-async function printSetupQr(url) {
-  if (!options.printSetupQr || !url) return
-
-  try {
-    const qrcodeModule = await import('qrcode-terminal')
-    const qrcode = qrcodeModule.default ?? qrcodeModule
-    qrcode.generate(url, { small: true })
-  } catch (error) {
-    console.log(`VibeTerm setup QR skipped: ${formatError(error)}`)
-  }
 }
 
 function escapeHtml(value) {

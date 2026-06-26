@@ -24,7 +24,7 @@ VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable 
 
 `VIBETERM_TMUX_EXEC_ROW` is the only command row run inside each new tmux project after the server changes into the project directory. Put any bootstrap work there.
 
-On startup the server prints a setup URL and QR. Set `VIBETERM_PUBLIC_HOST` to the LAN hostname or IP your phone can reach if the detected hostname is not resolvable. For prototype/dev installs, set `VIBETERM_HUB_APP_URL` to the Hub app URL to make the QR open the app with server settings prefilled.
+On startup the server prints a setup URL. Set `VIBETERM_PUBLIC_HOST` to the LAN hostname or IP your phone can reach if the detected hostname is not resolvable. Paste the printed URL into VibeTerm Settings -> Load Settings From URL.
 
 ## Endpoints
 
