@@ -17,7 +17,7 @@ Edit `.env.local` before starting:
 ```bash
 VIBETERM_PROJECT_TOKEN=change-me
 VIBETERM_PROJECTS_DIR=.projects
-VIBETERM_TMUX_SESSION_PREFIX=displayterm-
+VIBETERM_TMUX_SESSION_PREFIX=vibeterm-
 VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'
 ```
 

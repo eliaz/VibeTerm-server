@@ -18,7 +18,7 @@ const options = {
   projectToken: process.env.VIBETERM_PROJECT_TOKEN || '',
   projectsDir: process.env.VIBETERM_PROJECTS_DIR || '.projects',
   tmuxExecRow: firstEnv('VIBETERM_TMUX_EXEC_ROW'),
-  tmuxSessionPrefix: process.env.VIBETERM_TMUX_SESSION_PREFIX || 'displayterm-',
+  tmuxSessionPrefix: process.env.VIBETERM_TMUX_SESSION_PREFIX || 'vibeterm-',
   tmuxHistoryLines: Number(process.env.VIBETERM_TMUX_HISTORY_LINES || 240),
   tmuxBootDelayMs: Number(process.env.VIBETERM_TMUX_BOOT_DELAY_MS || 1200),
   tmuxRestartExec: firstEnv('VIBETERM_TMUX_RESTART_EXEC') !== '0',
@@ -785,8 +785,8 @@ function firstEnv(...names) {
 }
 
 function normalizeTmuxPrefix(value) {
-  const prefix = String(value || 'displayterm-').trim() || 'displayterm-'
-  if (!/^[A-Za-z0-9._-]+$/.test(prefix)) return 'displayterm-'
+  const prefix = String(value || 'vibeterm-').trim() || 'vibeterm-'
+  if (!/^[A-Za-z0-9._-]+$/.test(prefix)) return 'vibeterm-'
   return prefix
 }
 
