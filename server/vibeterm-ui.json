@@ -20,7 +20,7 @@
     "sessions.title": "Attach project",
     "sessions.empty": "No existing projects",
     "close.title": "Close terminal",
-    "close.empty": "No running terminals",
+    "close.empty": "No terminals to close",
     "exports.title": "Web exports",
     "exports.empty": "No web exports",
     "terminal.title": "Terminal",

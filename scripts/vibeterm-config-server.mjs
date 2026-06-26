@@ -1181,10 +1181,12 @@ function defaultLegacyTmuxSessionPrefixes() {
   return [
     `vibeterm-${namespaceSuffix}`,
     `eventerm-${namespaceSuffix}`,
+    `eveterm-${namespaceSuffix}`,
     `displayterm-${namespaceSuffix}`,
     `eterm-${namespaceSuffix}`,
     'vibeterm-',
     'eventerm-',
+    'eveterm-',
     'displayterm-',
     'eterm-',
   ]
