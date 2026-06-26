@@ -34,7 +34,7 @@
     "actions.upKey": "Up key",
     "actions.downKey": "Down key",
     "actions.newProject": "New project",
-    "actions.reinitializeProject": "Reinitialize project",
+    "actions.reinitializeProject": "Reinitialize tmux session towards project",
     "actions.projectName": "Project name",
     "actions.projectPrompt": "First prompt",
     "actions.interrupt": "Send Ctrl-C",
