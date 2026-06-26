@@ -17,9 +17,9 @@ load_env_file "$ROOT_DIR/.env"
 load_env_file "$ROOT_DIR/.env.local"
 
 cd "$ROOT_DIR"
-mkdir -p "${EVENTERM_LOG_DIR:-.logs}"
+mkdir -p "${VIBETERM_LOG_DIR:-.logs}"
 
-exec node scripts/eterm-config-server.mjs \
-  --host "${ETERM_UI_HOST:-0.0.0.0}" \
-  --port "${ETERM_UI_PORT:-3457}" \
-  --file "${ETERM_UI_FILE:-server/eterm-ui.json}"
+exec node scripts/vibeterm-config-server.mjs \
+  --host "${VIBETERM_UI_HOST:-0.0.0.0}" \
+  --port "${VIBETERM_UI_PORT:-3457}" \
+  --file "${VIBETERM_UI_FILE:-server/vibeterm-ui.json}"

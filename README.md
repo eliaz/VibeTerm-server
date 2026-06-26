@@ -15,17 +15,17 @@ npm start
 Edit `.env.local` before starting:
 
 ```bash
-ETERM_PROJECT_TOKEN=change-me
-ETERM_PROJECTS_DIR=.projects
-ETERM_TMUX_SESSION_PREFIX=eventerm-
-ETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'
+VIBETERM_PROJECT_TOKEN=change-me
+VIBETERM_PROJECTS_DIR=.projects
+VIBETERM_TMUX_SESSION_PREFIX=displayterm-
+VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'
 ```
 
-`ETERM_TMUX_EXEC_ROW` is the only command row run inside each new tmux project after the server changes into the project directory. Put any bootstrap work there.
+`VIBETERM_TMUX_EXEC_ROW` is the only command row run inside each new tmux project after the server changes into the project directory. Put any bootstrap work there.
 
 ## Endpoints
 
-- `GET /ui.json` serves `server/eterm-ui.json`.
+- `GET /ui.json` serves `server/vibeterm-ui.json`.
 - `GET /api/info?token=...` returns sidecar status.
 - `GET /api/sessions?token=...` lists VibeTerm tmux sessions.
 - `POST /api/projects` creates and optionally launches a project.

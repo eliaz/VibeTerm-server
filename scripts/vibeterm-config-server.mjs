@@ -7,25 +7,25 @@ import { join, relative, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
 const options = {
-  host: process.env.ETERM_UI_HOST || '0.0.0.0',
-  port: Number(process.env.ETERM_UI_PORT || 3457),
-  file: process.env.ETERM_UI_FILE || 'server/eterm-ui.json',
-  sttCommand: process.env.ETERM_STT_COMMAND || '',
-  sttMaxBytes: Number(process.env.ETERM_STT_MAX_BYTES || 10 * 1024 * 1024),
-  sttOpenaiModel: process.env.ETERM_STT_OPENAI_MODEL || 'gpt-4o-mini-transcribe',
+  host: process.env.VIBETERM_UI_HOST || '0.0.0.0',
+  port: Number(process.env.VIBETERM_UI_PORT || 3457),
+  file: process.env.VIBETERM_UI_FILE || 'server/vibeterm-ui.json',
+  sttCommand: process.env.VIBETERM_STT_COMMAND || '',
+  sttMaxBytes: Number(process.env.VIBETERM_STT_MAX_BYTES || 10 * 1024 * 1024),
+  sttOpenaiModel: process.env.VIBETERM_STT_OPENAI_MODEL || 'gpt-4o-mini-transcribe',
   sttOpenaiBaseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-  sttTimeoutMs: Number(process.env.ETERM_STT_TIMEOUT_MS || 30000),
-  projectToken: process.env.ETERM_PROJECT_TOKEN || '',
-  projectsDir: process.env.ETERM_PROJECTS_DIR || '.projects',
-  tmuxExecRow: firstEnv('ETERM_TMUX_EXEC_ROW'),
-  tmuxSessionPrefix: process.env.ETERM_TMUX_SESSION_PREFIX || 'eventerm-',
-  tmuxHistoryLines: Number(process.env.ETERM_TMUX_HISTORY_LINES || 240),
-  tmuxBootDelayMs: Number(process.env.ETERM_TMUX_BOOT_DELAY_MS || 1200),
-  tmuxRestartExec: firstEnv('ETERM_TMUX_RESTART_EXEC') !== '0',
-  tmuxRestartDelay: Number(process.env.ETERM_TMUX_RESTART_DELAY || 2),
-  tmuxAutoExport: process.env.ETERM_TMUX_AUTO_EXPORT !== '0',
-  tmuxExportBasePort: Number(process.env.ETERM_TMUX_EXPORT_BASE_PORT || 7681),
-  tmuxExportDuration: process.env.ETERM_TMUX_EXPORT_DURATION || '6h',
+  sttTimeoutMs: Number(process.env.VIBETERM_STT_TIMEOUT_MS || 30000),
+  projectToken: process.env.VIBETERM_PROJECT_TOKEN || '',
+  projectsDir: process.env.VIBETERM_PROJECTS_DIR || '.projects',
+  tmuxExecRow: firstEnv('VIBETERM_TMUX_EXEC_ROW'),
+  tmuxSessionPrefix: process.env.VIBETERM_TMUX_SESSION_PREFIX || 'displayterm-',
+  tmuxHistoryLines: Number(process.env.VIBETERM_TMUX_HISTORY_LINES || 240),
+  tmuxBootDelayMs: Number(process.env.VIBETERM_TMUX_BOOT_DELAY_MS || 1200),
+  tmuxRestartExec: firstEnv('VIBETERM_TMUX_RESTART_EXEC') !== '0',
+  tmuxRestartDelay: Number(process.env.VIBETERM_TMUX_RESTART_DELAY || 2),
+  tmuxAutoExport: process.env.VIBETERM_TMUX_AUTO_EXPORT !== '0',
+  tmuxExportBasePort: Number(process.env.VIBETERM_TMUX_EXPORT_BASE_PORT || 7681),
+  tmuxExportDuration: process.env.VIBETERM_TMUX_EXPORT_DURATION || '24h',
 }
 
 for (let index = 0; index < args.length; index += 1) {
@@ -40,29 +40,29 @@ for (let index = 0; index < args.length; index += 1) {
     options.file = args[index + 1] || options.file
     index += 1
   } else {
-    console.error(`eterm-config-server: unknown option ${arg}`)
+    console.error(`vibeterm-config-server: unknown option ${arg}`)
     process.exit(1)
   }
 }
 
 if (!Number.isInteger(options.port) || options.port <= 0) {
-  console.error(`eterm-config-server: invalid port ${options.port}`)
+  console.error(`vibeterm-config-server: invalid port ${options.port}`)
   process.exit(1)
 }
 
 if (!Number.isFinite(options.sttMaxBytes) || options.sttMaxBytes <= 0) {
-  console.error(`eterm-config-server: invalid ETERM_STT_MAX_BYTES ${options.sttMaxBytes}`)
+  console.error(`vibeterm-config-server: invalid VIBETERM_STT_MAX_BYTES ${options.sttMaxBytes}`)
   process.exit(1)
 }
 
 if (!Number.isFinite(options.sttTimeoutMs) || options.sttTimeoutMs <= 0) {
-  console.error(`eterm-config-server: invalid ETERM_STT_TIMEOUT_MS ${options.sttTimeoutMs}`)
+  console.error(`vibeterm-config-server: invalid VIBETERM_STT_TIMEOUT_MS ${options.sttTimeoutMs}`)
   process.exit(1)
 }
 
 if (!options.tmuxExecRow.trim()) {
-  console.error('eterm-config-server: set ETERM_TMUX_EXEC_ROW in .env.local, for example:')
-  console.error("  ETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'")
+  console.error('vibeterm-config-server: set VIBETERM_TMUX_EXEC_ROW in .env.local, for example:')
+  console.error("  VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'")
   process.exit(1)
 }
 
@@ -140,7 +140,7 @@ server.listen(options.port, options.host, () => {
 function setCorsHeaders(response) {
   response.setHeader('Access-Control-Allow-Origin', '*')
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-VibeTerm-Input-Label, X-Eterm-Input-Label')
+  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-VibeTerm-Input-Label')
   response.setHeader('Cache-Control', 'no-store')
 }
 
@@ -386,7 +386,7 @@ async function ensureTmuxExecSession(sessionName, cwd, steps = []) {
   }
 
   steps.push(`tmux new-session -d -s ${sessionName}`)
-  steps.push(`run ETERM_TMUX_EXEC_ROW in ${relativeProjectPath(cwd)}`)
+  steps.push(`run VIBETERM_TMUX_EXEC_ROW in ${relativeProjectPath(cwd)}`)
   const command = tmuxExecLauncher(cwd)
   await runCommand('tmux', ['new-session', '-d', '-s', sessionName, command])
 }
@@ -785,8 +785,8 @@ function firstEnv(...names) {
 }
 
 function normalizeTmuxPrefix(value) {
-  const prefix = String(value || 'eventerm-').trim() || 'eventerm-'
-  if (!/^[A-Za-z0-9._-]+$/.test(prefix)) return 'eventerm-'
+  const prefix = String(value || 'displayterm-').trim() || 'displayterm-'
+  if (!/^[A-Za-z0-9._-]+$/.test(prefix)) return 'displayterm-'
   return prefix
 }
 
@@ -916,7 +916,7 @@ async function transcribeAudio(audio) {
   }
 
   const error = new Error(
-    'No STT backend configured. Set OPENAI_API_KEY or ETERM_STT_COMMAND before starting the Even stack.',
+    'No STT backend configured. Set OPENAI_API_KEY or VIBETERM_STT_COMMAND before starting the VibeTerm stack.',
   )
   error.status = 501
   throw error
@@ -927,11 +927,11 @@ async function transcribeWithOpenAI(audio) {
   form.append('file', new Blob([audio], { type: 'audio/wav' }), 'g2-voice.wav')
   form.append('model', options.sttOpenaiModel)
 
-  if (process.env.ETERM_STT_LANGUAGE) {
-    form.append('language', process.env.ETERM_STT_LANGUAGE)
+  if (process.env.VIBETERM_STT_LANGUAGE) {
+    form.append('language', process.env.VIBETERM_STT_LANGUAGE)
   }
-  if (process.env.ETERM_STT_PROMPT) {
-    form.append('prompt', process.env.ETERM_STT_PROMPT)
+  if (process.env.VIBETERM_STT_PROMPT) {
+    form.append('prompt', process.env.VIBETERM_STT_PROMPT)
   }
 
   const response = await fetch(`${options.sttOpenaiBaseUrl}/audio/transcriptions`, {
