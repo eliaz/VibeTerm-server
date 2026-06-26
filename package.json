@@ -1,0 +1,13 @@
+{
+  "name": "eventerm-server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "scripts": {
+    "start": "./start-server.sh",
+    "check": "node --check scripts/eterm-config-server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

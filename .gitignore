@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.local
+.logs/
+.projects/
+*.log
+*.wav
+.DS_Store
