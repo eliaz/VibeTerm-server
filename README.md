@@ -1,6 +1,6 @@
-# Eventerm Server
+# VibeTerm Server
 
-Public server-side companion for the private Eventerm Even Hub app.
+Public server-side companion for the private VibeTerm Even Hub app.
 
 It runs on your machine, creates project folders, starts prefixed tmux sessions, serves the editable glasses UI config, exposes tmux snapshots/events to the phone app, and optionally transcribes G2 microphone audio.
 
@@ -27,7 +27,7 @@ ETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use
 
 - `GET /ui.json` serves `server/eterm-ui.json`.
 - `GET /api/info?token=...` returns sidecar status.
-- `GET /api/sessions?token=...` lists Eventerm tmux sessions.
+- `GET /api/sessions?token=...` lists VibeTerm tmux sessions.
 - `POST /api/projects` creates and optionally launches a project.
 - `POST /api/projects/reinitialize` recreates the project tmux session.
 - `GET /api/events?sessionId=...&token=...` streams tmux snapshots.

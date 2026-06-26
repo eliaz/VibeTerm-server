@@ -128,19 +128,19 @@ const server = createServer(async (request, response) => {
 })
 
 server.listen(options.port, options.host, () => {
-  console.log(`Eterm UI config: http://${options.host}:${options.port}/ui.json`)
-  console.log(`Eterm STT: http://${options.host}:${options.port}/api/transcribe (${sttMode()})`)
-  console.log(`Eterm tmux projects: ${projectsDir}`)
-  console.log(`Eterm tmux prefix: ${options.tmuxSessionPrefix}`)
-  console.log(`Eterm tmux exec restart: ${options.tmuxRestartExec ? `on after ${options.tmuxRestartDelay}s` : 'off'}`)
-  console.log(`Eterm tmux web export: ${options.tmuxAutoExport ? `on from ${options.tmuxExportBasePort}` : 'off'}`)
+  console.log(`VibeTerm UI config: http://${options.host}:${options.port}/ui.json`)
+  console.log(`VibeTerm STT: http://${options.host}:${options.port}/api/transcribe (${sttMode()})`)
+  console.log(`VibeTerm tmux projects: ${projectsDir}`)
+  console.log(`VibeTerm tmux prefix: ${options.tmuxSessionPrefix}`)
+  console.log(`VibeTerm tmux exec restart: ${options.tmuxRestartExec ? `on after ${options.tmuxRestartDelay}s` : 'off'}`)
+  console.log(`VibeTerm tmux web export: ${options.tmuxAutoExport ? `on from ${options.tmuxExportBasePort}` : 'off'}`)
   console.log(`File: ${uiFile}`)
 })
 
 function setCorsHeaders(response) {
   response.setHeader('Access-Control-Allow-Origin', '*')
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Eterm-Input-Label')
+  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-VibeTerm-Input-Label, X-Eterm-Input-Label')
   response.setHeader('Cache-Control', 'no-store')
 }
 
@@ -752,7 +752,7 @@ function projectNameFromSessionId(sessionId) {
   const value = requiredSessionId(sessionId)
   const prefix = normalizeTmuxPrefix(options.tmuxSessionPrefix)
   if (!value.startsWith(prefix)) {
-    const error = new Error('Session does not belong to this Eventerm server')
+    const error = new Error('Session does not belong to this VibeTerm server')
     error.status = 400
     throw error
   }
@@ -770,7 +770,7 @@ function tmuxExecLauncher(cwd) {
   return [
     `${cd}; while :; do ${options.tmuxExecRow}`,
     'code=$?',
-    `printf '\\n[Eterm] tmux exec row exited with status %s. Restarting in ${delaySeconds}s. Press Ctrl-C to stop.\\n' "$code"`,
+    `printf '\\n[VibeTerm] tmux exec row exited with status %s. Restarting in ${delaySeconds}s. Press Ctrl-C to stop.\\n' "$code"`,
     `sleep ${delay}`,
     'done',
   ].join('; ')
@@ -955,7 +955,7 @@ async function transcribeWithOpenAI(audio) {
 }
 
 async function transcribeWithCommand(audio) {
-  const tempDir = await mkdtemp(join(tmpdir(), 'eterm-stt-'))
+  const tempDir = await mkdtemp(join(tmpdir(), 'vibeterm-stt-'))
   const audioPath = join(tempDir, 'input.wav')
 
   try {

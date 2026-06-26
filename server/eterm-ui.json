@@ -1,5 +1,5 @@
 {
-  "brand": "Eterm",
+  "brand": "VibeTerm",
   "pollMs": 2000,
   "voiceCapture": {
     "minMs": 2500,
