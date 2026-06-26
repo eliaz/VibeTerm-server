@@ -41,6 +41,7 @@
     "actions.attachProject": "Attach project",
     "actions.webExports": "Web exports",
     "actions.clearSessions": "Clear projects",
+    "actions.reconnectDisplay": "Reconnect display",
     "actions.settings": "Settings",
     "actions.mainMenu": "Main menu",
     "actions.back": "Back",
