@@ -8,6 +8,7 @@ It runs on your machine, creates project folders, starts prefixed tmux sessions,
 
 ```bash
 cp .env.example .env.local
+npm install
 npm run check
 npm start
 ```
@@ -23,9 +24,13 @@ VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable 
 
 `VIBETERM_TMUX_EXEC_ROW` is the only command row run inside each new tmux project after the server changes into the project directory. Put any bootstrap work there.
 
+On startup the server prints a setup URL and QR. Set `VIBETERM_PUBLIC_HOST` to the LAN hostname or IP your phone can reach if the detected hostname is not resolvable. For prototype/dev installs, set `VIBETERM_HUB_APP_URL` to the Hub app URL to make the QR open the app with server settings prefilled.
+
 ## Endpoints
 
 - `GET /ui.json` serves `server/vibeterm-ui.json`.
+- `GET /setup?token=...` shows runtime settings for the Hub app.
+- `GET /setup.json?token=...` returns those settings as JSON.
 - `GET /api/info?token=...` returns sidecar status.
 - `GET /api/sessions?token=...` lists VibeTerm tmux sessions.
 - `POST /api/projects` creates and optionally launches a project.

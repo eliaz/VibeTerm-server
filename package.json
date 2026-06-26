@@ -7,6 +7,9 @@
     "start": "./start-server.sh",
     "check": "node --check scripts/vibeterm-config-server.mjs"
   },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0"
+  },
   "engines": {
     "node": ">=20"
   }

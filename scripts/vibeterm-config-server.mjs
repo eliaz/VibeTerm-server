@@ -2,7 +2,7 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { hostname, tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -26,6 +26,10 @@ const options = {
   tmuxAutoExport: process.env.VIBETERM_TMUX_AUTO_EXPORT !== '0',
   tmuxExportBasePort: Number(process.env.VIBETERM_TMUX_EXPORT_BASE_PORT || 7681),
   tmuxExportDuration: process.env.VIBETERM_TMUX_EXPORT_DURATION || '24h',
+  publicHost: process.env.VIBETERM_PUBLIC_HOST || '',
+  hubAppUrl: process.env.VIBETERM_HUB_APP_URL || '',
+  sessionNamespace: process.env.VIBETERM_SESSION_NAMESPACE || 'even-glasses',
+  printSetupQr: process.env.VIBETERM_PRINT_SETUP_QR !== '0',
 }
 
 for (let index = 0; index < args.length; index += 1) {
@@ -91,6 +95,21 @@ const server = createServer(async (request, response) => {
     return
   }
 
+  if (request.method === 'GET' && (url.pathname === '/setup' || url.pathname === '/setup.json')) {
+    if (!authorized(request, url)) {
+      sendJson(response, 401, { error: 'Unauthorized' })
+      return
+    }
+
+    const payload = setupPayload(request.headers.host || '')
+    if (url.pathname === '/setup.json') {
+      sendJson(response, 200, payload)
+    } else {
+      sendHtml(response, 200, setupHtml(payload))
+    }
+    return
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/transcribe') {
     await handleTranscribe(request, response)
     return
@@ -128,14 +147,24 @@ const server = createServer(async (request, response) => {
 })
 
 server.listen(options.port, options.host, () => {
-  console.log(`VibeTerm UI config: http://${options.host}:${options.port}/ui.json`)
-  console.log(`VibeTerm STT: http://${options.host}:${options.port}/api/transcribe (${sttMode()})`)
+  void printStartupInfo()
+})
+
+async function printStartupInfo() {
+  const setup = setupPayload('')
+  console.log(`VibeTerm UI config: ${setup.settings.uiConfigUrl}`)
+  console.log(`VibeTerm STT: ${setup.settings.sttUrl} (${sttMode()})`)
   console.log(`VibeTerm tmux projects: ${projectsDir}`)
   console.log(`VibeTerm tmux prefix: ${options.tmuxSessionPrefix}`)
   console.log(`VibeTerm tmux exec restart: ${options.tmuxRestartExec ? `on after ${options.tmuxRestartDelay}s` : 'off'}`)
   console.log(`VibeTerm tmux web export: ${options.tmuxAutoExport ? `on from ${options.tmuxExportBasePort}` : 'off'}`)
+  console.log(`VibeTerm setup: ${setup.setupUrl}`)
+  if (setup.hubAppUrl) {
+    console.log(`VibeTerm app setup: ${setup.hubAppUrl}`)
+  }
   console.log(`File: ${uiFile}`)
-})
+  await printSetupQr(setup.hubAppUrl || setup.setupUrl)
+}
 
 function setCorsHeaders(response) {
   response.setHeader('Access-Control-Allow-Origin', '*')
@@ -147,6 +176,122 @@ function setCorsHeaders(response) {
 function sendJson(response, status, value) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
   response.end(`${JSON.stringify(value)}\n`)
+}
+
+function sendHtml(response, status, value) {
+  response.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' })
+  response.end(value)
+}
+
+function setupPayload(requestHost) {
+  const baseUrl = publicBaseUrl(requestHost)
+  const settings = {
+    serverUrl: baseUrl,
+    uiConfigUrl: `${baseUrl}/ui.json`,
+    sttUrl: `${baseUrl}/api/transcribe`,
+    token: options.projectToken,
+    provider: 'tmux',
+    cwd: '',
+    autoAttach: true,
+    startPrompt: '',
+    sessionNamespace: options.sessionNamespace,
+    showExternalSessions: false,
+  }
+
+  return {
+    name: 'VibeTerm',
+    setupUrl: setupServerUrl('/setup', baseUrl),
+    setupJsonUrl: setupServerUrl('/setup.json', baseUrl),
+    hubAppUrl: options.hubAppUrl ? hubAppSetupUrl(options.hubAppUrl, settings) : '',
+    settings,
+  }
+}
+
+function publicBaseUrl(requestHost) {
+  const requestName = String(requestHost || '').split(':')[0]
+  const host =
+    options.publicHost ||
+    requestName ||
+    (options.host === '0.0.0.0' || options.host === '::' ? hostname() : options.host) ||
+    'localhost'
+  return `http://${host}:${options.port}`
+}
+
+function setupServerUrl(pathname, baseUrl) {
+  const url = new URL(pathname, baseUrl)
+  if (options.projectToken) {
+    url.searchParams.set('token', options.projectToken)
+  }
+  return url.toString()
+}
+
+function hubAppSetupUrl(appUrl, settings) {
+  const url = new URL(appUrl)
+  url.search = new URLSearchParams({
+    serverUrl: settings.serverUrl,
+    uiConfigUrl: settings.uiConfigUrl,
+    sttUrl: settings.sttUrl,
+    token: settings.token,
+    provider: settings.provider,
+    cwd: settings.cwd,
+    autoAttach: settings.autoAttach ? '1' : '0',
+    startPrompt: settings.startPrompt,
+    sessionNamespace: settings.sessionNamespace,
+    showExternalSessions: settings.showExternalSessions ? '1' : '0',
+  }).toString()
+  return url.toString()
+}
+
+function setupHtml(payload) {
+  const settingsJson = JSON.stringify(payload.settings, null, 2)
+  const appLink = payload.hubAppUrl
+    ? `<p><a href="${escapeHtml(payload.hubAppUrl)}">Open configured VibeTerm app</a></p>`
+    : ''
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VibeTerm Setup</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 48rem; line-height: 1.45; }
+      code, pre { background: #f4f4f4; border-radius: 6px; }
+      code { padding: 0.12rem 0.3rem; }
+      pre { overflow: auto; padding: 1rem; }
+      a { color: #0645ad; }
+    </style>
+  </head>
+  <body>
+    <h1>VibeTerm Setup</h1>
+    ${appLink}
+    <p>Use these runtime settings in the VibeTerm Hub app. Keep the token private.</p>
+    <pre>${escapeHtml(settingsJson)}</pre>
+    <p>JSON endpoint: <a href="${escapeHtml(payload.setupJsonUrl)}">${escapeHtml(payload.setupJsonUrl)}</a></p>
+  </body>
+</html>
+`
+}
+
+async function printSetupQr(url) {
+  if (!options.printSetupQr || !url) return
+
+  try {
+    const qrcodeModule = await import('qrcode-terminal')
+    const qrcode = qrcodeModule.default ?? qrcodeModule
+    qrcode.generate(url, { small: true })
+  } catch (error) {
+    console.log(`VibeTerm setup QR skipped: ${formatError(error)}`)
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
 }
 
 async function handleProjects(request, response, url) {
