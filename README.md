@@ -4,6 +4,12 @@ Public server-side companion for the private VibeTerm Even Hub app.
 
 It runs on your machine, creates project folders, starts prefixed tmux sessions, serves the editable glasses UI config, exposes tmux snapshots/events to the phone app, and optionally transcribes G2 microphone audio.
 
+
+## Security note
+Security is your responsibility. VibeTerm can create folders, start tmux sessions, send text to a shell, stream terminal output, and expose tmux in a browser. Use only on trusted networks, preferably through Tailscale or another private VPN. Do not expose the server or ttyd exports to the public internet.
+
+This is vibe-coded / AI-assisted experimental software. Useful, but not formally audited or hardened. Use at your own risk.
+
 ## Setup
 
 ```bash
