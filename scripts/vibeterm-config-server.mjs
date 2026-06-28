@@ -10,6 +10,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
 const tlsDefaultEnabled = process.env.VIBETERM_TLS === '1'
+const PROJECT_NAME_MAX_LENGTH = 80
 const options = {
   host: process.env.VIBETERM_UI_HOST || '0.0.0.0',
   port: Number(process.env.VIBETERM_UI_PORT || 3457),
@@ -32,7 +33,7 @@ const options = {
   tmuxBootDelayMs: Number(process.env.VIBETERM_TMUX_BOOT_DELAY_MS || 1200),
   tmuxRestartExec: firstEnv('VIBETERM_TMUX_RESTART_EXEC') !== '0',
   tmuxRestartDelay: Number(process.env.VIBETERM_TMUX_RESTART_DELAY || 2),
-  tmuxAutoExport: process.env.VIBETERM_TMUX_AUTO_EXPORT === '1',
+  tmuxAutoExport: process.env.VIBETERM_TMUX_AUTO_EXPORT !== '0',
   tmuxExportBasePort: Number(process.env.VIBETERM_TMUX_EXPORT_BASE_PORT || 7681),
   tmuxExportDuration: process.env.VIBETERM_TMUX_EXPORT_DURATION || '24h',
   tmuxExportTls: process.env.VIBETERM_TMUX_EXPORT_TLS
@@ -1143,15 +1144,40 @@ async function directoryExists(path) {
 }
 
 function normalizeProjectName(value) {
-  const name = String(value || '')
-    .trim()
-    .replace(/\s+/g, '-')
+  const name = folderSafeProjectName(value)
   if (!name || name === '.' || name === '..' || !/^[A-Za-z0-9._-]+$/.test(name)) {
-    const error = new Error('Use a project name with letters, numbers, dot, dash, or underscore.')
+    const error = new Error('Use a project name that can become a folder name, for example letters, numbers, spaces, dot, dash, or underscore.')
     error.status = 400
     throw error
   }
   return name
+}
+
+function folderSafeProjectName(value) {
+  const withoutAccents = String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, '')
+    .replace(/&/g, ' and ')
+
+  const withSpokenPunctuation = withoutAccents
+    .replace(/\bunder\s+score\b/gi, '_')
+    .replace(/\bunderscore\b/gi, '_')
+    .replace(/\b(?:dash|hyphen|minus)\b/gi, '-')
+    .replace(/\b(?:dot|period|point)\b/gi, '.')
+    .replace(/\b(?:space|blank)\b/gi, '_')
+    .replace(/\b(?:double\s+quote|single\s+quote|quote|apostrophe|slash|backslash|colon|semicolon|comma)\b/gi, ' ')
+
+  return withSpokenPunctuation
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/_?([.-])_?/g, '$1')
+    .replace(/_{2,}/g, '_')
+    .replace(/-{2,}/g, '-')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, PROJECT_NAME_MAX_LENGTH)
+    .replace(/[._-]+$/g, '')
 }
 
 function tmuxSessionName(projectName) {
@@ -1193,11 +1219,9 @@ function sessionPrefixesForProjectDecode() {
 function legacyTmuxSessionPrefixes() {
   const configured = String(options.tmuxLegacySessionPrefixes || '').trim()
   if (/^(0|false|off)$/i.test(configured)) return []
+  if (!configured) return []
 
-  const rawPrefixes = configured
-    ? configured.split(/[,\s]+/)
-    : defaultLegacyTmuxSessionPrefixes()
-
+  const rawPrefixes = configured.split(/[,\s]+/)
   const currentPrefix = normalizeTmuxPrefix(options.tmuxSessionPrefix)
   const seen = new Set()
   const prefixes = []
@@ -1208,23 +1232,6 @@ function legacyTmuxSessionPrefixes() {
     prefixes.push(prefix)
   }
   return prefixes
-}
-
-function defaultLegacyTmuxSessionPrefixes() {
-  const namespace = String(options.sessionNamespace || '').trim()
-  const namespaceSuffix = namespace ? `${namespace}-` : ''
-  return [
-    `vibeterm-${namespaceSuffix}`,
-    `eventerm-${namespaceSuffix}`,
-    `eveterm-${namespaceSuffix}`,
-    `displayterm-${namespaceSuffix}`,
-    `eterm-${namespaceSuffix}`,
-    'vibeterm-',
-    'eventerm-',
-    'eveterm-',
-    'displayterm-',
-    'eterm-',
-  ]
 }
 
 function tmuxExecLauncher(cwd) {
@@ -1291,6 +1298,10 @@ function normalizeTmuxKey(value) {
     ['end', 'End'],
     ['pageup', 'PageUp'],
     ['pagedown', 'PageDown'],
+    ['c-u', 'C-u'],
+    ['ctrl-u', 'C-u'],
+    ['ctrlu', 'C-u'],
+    ['clearline', 'C-u'],
   ])
   const key = aliases.get(raw)
   if (!key) {

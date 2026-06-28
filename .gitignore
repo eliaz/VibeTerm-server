@@ -2,6 +2,7 @@ node_modules/
 .certs/
 .env
 .env.local
+.env*.backup
 .logs/
 .projects/
 *.log

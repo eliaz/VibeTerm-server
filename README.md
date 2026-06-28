@@ -35,9 +35,55 @@ TLS is off by default because the Even Hub app/WebView may reject local self-sig
 
 If you have a trusted certificate or trusted reverse proxy/tunnel, set `VIBETERM_TLS=1`. If `VIBETERM_TLS_CERT` and `VIBETERM_TLS_KEY` are missing, the server creates local self-signed certs under `.certs/`, but those dummy certs are not expected to work reliably in the Hub app.
 
-To expose tmux projects in a laptop browser, set `VIBETERM_TMUX_AUTO_EXPORT=1`. This starts plain HTTP `ttyd` exports from `VIBETERM_TMUX_EXPORT_BASE_PORT` for new/reinitialized projects. Treat it as very insecure: use only on a trusted LAN/VPN such as Tailscale, and leave it off otherwise.
+VibeTerm exposes tmux projects in a laptop browser by default with `ttyd` exports from `VIBETERM_TMUX_EXPORT_BASE_PORT` for new/reinitialized projects. Treat plain HTTP exports as very insecure: use only on a trusted LAN/VPN such as Tailscale, or set `VIBETERM_TMUX_AUTO_EXPORT=0` to disable them.
 
 On startup the server prints a setup URL. Set `VIBETERM_PUBLIC_HOST` to the LAN hostname or IP your phone can reach if the detected hostname is not resolvable. Paste the printed URL into VibeTerm Settings -> Load Settings From URL.
+
+## How It Behaves
+
+These screenshots show the phone-side browser panel next to the Even Hub simulator/glasses canvas. The server is doing the local work: creating folders, launching tmux sessions, streaming terminal output, and exposing browser exports.
+
+### 1. Start from the glasses menu
+
+The app starts with no active session. The server status is visible, and the main actions are project creation, attaching to existing tmux sessions, web exports, and terminal cleanup.
+
+<img src="docs/images/vibeterm-01-main-menu.png" alt="VibeTerm main menu with no active terminal session" width="780">
+
+### 2. Confirm the project name
+
+When the user speaks or types a new project name, the app asks for confirmation before the server creates a folder and tmux session.
+
+<img src="docs/images/vibeterm-02-confirm-project-name.png" alt="VibeTerm confirming the project name before creating it" width="780">
+
+### 3. Use terminal actions
+
+After a project is attached, VibeTerm shows terminal controls for sending text and common keys while the phone view mirrors the tmux output.
+
+<img src="docs/images/vibeterm-03-terminal-actions.png" alt="VibeTerm terminal actions menu for an attached project" width="780">
+
+### 4. Confirm text before sending
+
+Text headed to the terminal is confirmed before it is sent. This prevents accidental prompts from being injected into the active tmux session.
+
+<img src="docs/images/vibeterm-04-confirm-send-text.png" alt="VibeTerm confirming a text prompt before sending it to the terminal" width="780">
+
+### 5. Open web exports
+
+The server can expose the current tmux session through a local `ttyd` web export. VibeTerm lists the export URL from the glasses menu.
+
+<img src="docs/images/vibeterm-05-web-exports-list.png" alt="VibeTerm web exports list showing a browser-accessible tmux URL" width="780">
+
+### 6. Control tmux from a browser
+
+The same exported session can be opened directly in a browser for full tmux control on the laptop.
+
+<img src="docs/images/vibeterm-06-browser-tmux-export.png" alt="Browser view of the exported tmux session" width="780">
+
+### 7. Watch live terminal output
+
+As the terminal changes, the server streams snapshots back to VibeTerm so the phone and glasses display stay current.
+
+<img src="docs/images/vibeterm-07-live-terminal-output.png" alt="VibeTerm showing live terminal output from the active tmux session" width="780">
 
 ## Endpoints
 
