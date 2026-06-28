@@ -13,8 +13,11 @@ This is vibe-coded / AI-assisted experimental software. Useful, but not formally
 ## Setup
 
 ```bash
+git clone https://github.com/eliaz/VibeTerm-server.git
+cd VibeTerm-server
 cp .env.example .env.local
 npm install
+$EDITOR .env.local
 npm run check
 npm start
 ```
@@ -30,6 +33,10 @@ OPENAI_API_KEY=sk-your-key
 VIBETERM_STT_OPENAI_MODEL=whisper-1
 VIBETERM_TLS=0
 ```
+
+Set at least `VIBETERM_PROJECT_TOKEN`, `VIBETERM_TMUX_EXEC_ROW`, and `OPENAI_API_KEY` if using voice input. Set `VIBETERM_PUBLIC_HOST` if your phone needs a Tailscale/LAN hostname or IP instead of the machine hostname.
+
+Prerequisites: Node.js 20+, `tmux`, and `ttyd` for browser terminal exports. If you keep the default exec row, you also need `codex` installed.
 
 `VIBETERM_TMUX_EXEC_ROW` is the only command row run inside each new tmux project after the server changes into the project directory. Put any bootstrap work there.
 
