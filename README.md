@@ -28,7 +28,7 @@ Edit `.env.local` before starting. Update the following (atleast) :
 VIBETERM_PROJECT_TOKEN=change-me
 VIBETERM_PROJECTS_DIR=.projects
 VIBETERM_TMUX_SESSION_PREFIX=vibeterm-
-VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --resume --yolo --enable use_legacy_landlock'
+VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --yolo --enable use_legacy_landlock'
 OPENAI_API_KEY=sk-your-key
 VIBETERM_STT_OPENAI_MODEL=whisper-1
 VIBETERM_TLS=0
