@@ -1,8 +1,8 @@
 # VibeTerm Server
 
-Public server-side companion for the private VibeTerm Even Hub app.
+Public server-side companion for the  VibeTerm Even Hub app. It works with the evenrealities G2 glasses.
 
-It runs on your machine, creates project folders, starts prefixed tmux sessions, serves the editable glasses UI config, exposes tmux snapshots/events to the phone app, and optionally transcribes G2 microphone audio.
+It runs on your machine, creates project folders, starts prefixed tmux sessions, serves the editable glasses UI config, exposes tmux snapshots/events to the phone app, and optionally transcribes G2 microphone audio. It also exposes the terminal sessions on a web url to access them from webbrowser+keyboard for full access.
 
 
 ## Security note
