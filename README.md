@@ -120,3 +120,7 @@ As the terminal changes, the server streams snapshots back to VibeTerm so the ph
 ## Secrets
 
 Do not commit `.env`, `.env.local`, `.projects`, `.logs`, audio files, or real API keys. Those are gitignored here.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
