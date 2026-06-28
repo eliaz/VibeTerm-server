@@ -22,7 +22,7 @@ npm run check
 npm start
 ```
 
-Edit `.env.local` before starting:
+Edit `.env.local` before starting. Update the following (atleast) :
 
 ```bash
 VIBETERM_PROJECT_TOKEN=change-me
