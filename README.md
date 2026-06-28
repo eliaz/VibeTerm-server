@@ -6,7 +6,7 @@ It runs on your machine, creates project folders, starts prefixed tmux sessions,
 
 
 ## Security note
-Security is your responsibility. VibeTerm can create folders, start tmux sessions, send text to a shell, stream terminal output, and expose tmux in a browser. Use only on trusted networks, preferably through Tailscale or another private VPN. Do not expose the server or ttyd exports to the public internet.
+Security is your responsibility. VibeTerm can create folders, start tmux sessions, send text to a shell, stream terminal output, and expose tmux in a browser. Use only on trusted networks, preferably through Tailscale or another private VPN. The traffic is unencrypted per default. Browser tmux exports are powerful and should be treated as a very sensitive remote terminal access.
 
 This is vibe-coded / AI-assisted experimental software. Useful, but not formally audited or hardened. Use at your own risk.
 
