@@ -21,7 +21,7 @@ const options = {
   tlsDays: Number(process.env.VIBETERM_TLS_DAYS || 3650),
   sttCommand: process.env.VIBETERM_STT_COMMAND || '',
   sttMaxBytes: Number(process.env.VIBETERM_STT_MAX_BYTES || 10 * 1024 * 1024),
-  sttOpenaiModel: process.env.VIBETERM_STT_OPENAI_MODEL || 'gpt-4o-mini-transcribe',
+  sttOpenaiModel: process.env.VIBETERM_STT_OPENAI_MODEL || 'whisper-1',
   sttOpenaiBaseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
   sttTimeoutMs: Number(process.env.VIBETERM_STT_TIMEOUT_MS || 30000),
   projectToken: process.env.VIBETERM_PROJECT_TOKEN || '',

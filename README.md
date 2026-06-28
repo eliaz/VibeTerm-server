@@ -20,10 +20,14 @@ VIBETERM_PROJECT_TOKEN=change-me
 VIBETERM_PROJECTS_DIR=.projects
 VIBETERM_TMUX_SESSION_PREFIX=vibeterm-
 VIBETERM_TMUX_EXEC_ROW='git init >/dev/null 2>&1 || true; codex --resume --yolo --enable use_legacy_landlock'
+OPENAI_API_KEY=sk-your-key
+VIBETERM_STT_OPENAI_MODEL=whisper-1
 VIBETERM_TLS=0
 ```
 
 `VIBETERM_TMUX_EXEC_ROW` is the only command row run inside each new tmux project after the server changes into the project directory. Put any bootstrap work there.
+
+Voice input uses OpenAI Whisper speech-to-text by default. Set `OPENAI_API_KEY` in `.env.local`, and change `VIBETERM_STT_OPENAI_MODEL` if you want a different OpenAI transcription model. To use a local Whisper binary instead, leave `OPENAI_API_KEY` empty and set `VIBETERM_STT_COMMAND`.
 
 VibeTerm treats disk/process state as truth:
 
